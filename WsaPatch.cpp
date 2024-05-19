@@ -51,6 +51,7 @@ namespace wsapatch {
     }
 
     using FuncRtlGetVersion = NTSYSAPI NTSTATUS(*)(PRTL_OSVERSIONINFOW lpVersionInformation);
+    using FuncIsOS = BOOL(*)(DWORD dwOS);
 
     NTSTATUS WINAPI FakeRtlGetVersion(PRTL_OSVERSIONINFOW lpVersionInformation) {
         // The minimal version is 10.0.22000.120 VER_NT_WORKSTATION
@@ -95,7 +96,7 @@ namespace wsapatch {
     FARPROC WINAPI BadGetProcAddressISOS(_In_ HMODULE hModule, _In_ LPCSTR lpProcName) {
         FARPROC result;
         if (hModule == hShlwapi && lpProcName != nullptr && strcmp(lpProcName, "IsOS") == 0) {
-            result = reinterpret_cast<FARPROC>(FakeRtlGetVersion);
+            result = reinterpret_cast<FARPROC>(FakeIsOS);
             SetLastError(0);
         }
         else {
@@ -233,7 +234,7 @@ namespace wsapatch {
         LOGD(L"hShlwapi = %p", hShlwapi);
         LOGD(L"WsaClient.exe = %p", hWsaClient);
         FuncRtlGetVersion funcRtlGetVersion = reinterpret_cast<FuncRtlGetVersion>(GetProcAddress(hNtdll, "RtlGetVersion"));
-        bool (*funcIsOS)(DWORD) = GetProcAddress(hShlwapi, "IsOS");
+        FuncIsOS funcIsOS = reinterpret_cast<FuncIsOS>(GetProcAddress(hShlwapi, "IsOS"));
         if (funcRtlGetVersion == nullptr) {
             LOGE(L"GetProcAddress(NTDLL.DLL, \"RtlGetVersion\") failed, GetLastError=%d", GetLastError());
             return false;
