@@ -67,7 +67,7 @@ namespace wsapatch {
         return STATUS_SUCCESS;
     }
 
-    bool FakeIsWindowsServer(){
+    bool FakeIsWindowsServer() {
         return false;
     }
     FARPROC WINAPI BadGetProcAddress(_In_ HMODULE hModule, _In_ LPCSTR lpProcName) {
@@ -251,6 +251,12 @@ namespace wsapatch {
         LOGD(L"Need to patch, gIsPatchVersionNumber=%d, gIsPatchProductType=%d", gIsPatchVersionNumber, gIsPatchProductType);
         int count = HookIATProcedure(hWsaClient, "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddress));
         int count2 = HookIATProcedure(hWsaClient, "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressX));
+        
+        HookIATProcedure(GetModuleHandleW(L"ntdll.dll"), "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressX));
+        HookIATProcedure(GetModuleHandleW(L"icu.dll"), "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressX));
+        HookIATProcedure(GetModuleHandleW(L"winhttp.dll"), "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressX));
+        HookIATProcedure(GetModuleHandleW(L"WSACodecs.dll"), "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressX));
+        HookIATProcedure(GetModuleHandleW(L"WSAProxy.dll"), "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressX));
         if (count == 0) {
             LOGE(L"HookIATProcedure failed, count=%d", count);
             return false;
