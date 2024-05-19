@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include <windows.h>
-#include <versionhelpers.h>
+
 #include "Log.h"
 #include "ErrnoRestorer.h"
 #include "TimeUtils.h"
@@ -50,7 +50,7 @@ namespace wsapatch {
     }
 
     using FuncRtlGetVersion = NTSYSAPI NTSTATUS(*)(PRTL_OSVERSIONINFOW lpVersionInformation);
-    using FuncIsWindowsServer = VERSIONHELPERAPI(*)();
+    using FuncIsWindowsServer = bool(*)();
 
     NTSTATUS WINAPI FakeRtlGetVersion(PRTL_OSVERSIONINFOW lpVersionInformation) {
         // The minimal version is 10.0.22000.120 VER_NT_WORKSTATION
@@ -67,7 +67,7 @@ namespace wsapatch {
         return STATUS_SUCCESS;
     }
 
-    VERSIONHELPERAPI IsWindowsServer(){
+    bool FakeIsWindowsServer(){
         return false;
     }
     FARPROC WINAPI BadGetProcAddress(_In_ HMODULE hModule, _In_ LPCSTR lpProcName) {
