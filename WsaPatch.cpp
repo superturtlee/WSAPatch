@@ -21,7 +21,6 @@ namespace wsapatch {
     bool gConsoleIsAllocated = false;
 
     HMODULE hNtdll = nullptr;
-    HMODULE hShlwapi = nullptr;
     HMODULE hWsaClient = nullptr;
 
     RTL_OSVERSIONINFOEXW gOsVersionInfo = { 0 };
@@ -51,7 +50,7 @@ namespace wsapatch {
     }
 
     using FuncRtlGetVersion = NTSYSAPI NTSTATUS(*)(PRTL_OSVERSIONINFOW lpVersionInformation);
-    using FuncIsOS = BOOL(*)(DWORD dwOS);
+    using FuncIsWindowsServer = VERSIONHELPERAPI(*)();
 
     NTSTATUS WINAPI FakeRtlGetVersion(PRTL_OSVERSIONINFOW lpVersionInformation) {
         // The minimal version is 10.0.22000.120 VER_NT_WORKSTATION
@@ -68,7 +67,7 @@ namespace wsapatch {
         return STATUS_SUCCESS;
     }
 
-    bool FakeIsOS(DWORD dwOS) {
+    VERSIONHELPERAPI IsWindowsServer(){
         return false;
     }
     FARPROC WINAPI BadGetProcAddress(_In_ HMODULE hModule, _In_ LPCSTR lpProcName) {
@@ -93,10 +92,10 @@ namespace wsapatch {
         }
         return result;
     }
-    FARPROC WINAPI BadGetProcAddressISOS(_In_ HMODULE hModule, _In_ LPCSTR lpProcName) {
+    FARPROC WINAPI BadGetProcAddressX(_In_ HMODULE hModule, _In_ LPCSTR lpProcName) {
         FARPROC result;
-        if (hModule == hShlwapi && lpProcName != nullptr && strcmp(lpProcName, "IsOS") == 0) {
-            result = reinterpret_cast<FARPROC>(FakeIsOS);
+        if (hModule == hNtdll && lpProcName != nullptr && strcmp(lpProcName, "IsWindowsServer") == 0) {
+            result = reinterpret_cast<FARPROC>(FakeIsWindowsServer);
             SetLastError(0);
         }
         else {
@@ -194,10 +193,6 @@ namespace wsapatch {
         if (hNtdll == nullptr) {
             return false;
         }
-        hShlwapi = GetModuleHandleW(L"shlwapi.dll");
-        if (hShlwapi == nullptr) {
-            return false;
-        }
         checkEnableDebugConsole();
         hWsaClient = GetModuleHandleW(L"WsaClient.exe");
         if (kDebug) {
@@ -213,7 +208,7 @@ namespace wsapatch {
                 MessageBoxW(nullptr, msg.c_str(), L"wsapatch.dll", MB_OK | MB_ICONERROR);
             }
         }
-        LOGD(L"OnLoad, hInstDLL=%p, hNtdll=%p, hShlwapi=%p, hWsaClient=%p", hInstDLL, hNtdll, hShlwapi, hWsaClient);
+        LOGD(L"OnLoad, hInstDLL=%p, hNtdll=%p, hWsaClient=%p", hInstDLL, hNtdll, hWsaClient);
         if (hWsaClient == nullptr) {
             // check if we are loaded into the correct process
             WCHAR filename[MAX_PATH];
@@ -231,10 +226,9 @@ namespace wsapatch {
             return false;
         }
         LOGD(L"ntdll.dll = %p", hNtdll);
-        LOGD(L"hShlwapi = %p", hShlwapi);
         LOGD(L"WsaClient.exe = %p", hWsaClient);
         FuncRtlGetVersion funcRtlGetVersion = reinterpret_cast<FuncRtlGetVersion>(GetProcAddress(hNtdll, "RtlGetVersion"));
-        FuncIsOS funcIsOS = reinterpret_cast<FuncIsOS>(GetProcAddress(hShlwapi, "IsOS"));
+        FuncIsWindowsServer funcIsWindowsServer = reinterpret_cast<FuncIsWindowsServer>(GetProcAddress(hNtdll, "IsWindowsServer"));
         if (funcRtlGetVersion == nullptr) {
             LOGE(L"GetProcAddress(NTDLL.DLL, \"RtlGetVersion\") failed, GetLastError=%d", GetLastError());
             return false;
@@ -256,7 +250,7 @@ namespace wsapatch {
         }
         LOGD(L"Need to patch, gIsPatchVersionNumber=%d, gIsPatchProductType=%d", gIsPatchVersionNumber, gIsPatchProductType);
         int count = HookIATProcedure(hWsaClient, "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddress));
-        int count2 = HookIATProcedure(hWsaClient, "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressISOS));
+        int count2 = HookIATProcedure(hWsaClient, "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddressX));
         if (count == 0) {
             LOGE(L"HookIATProcedure failed, count=%d", count);
             return false;
@@ -265,8 +259,6 @@ namespace wsapatch {
             LOGI(L"HookIATProcedure success, count=%d", count);
         }
         // auxiliary hooks
-        // HookIATProcedure(GetModuleHandleW(L"winhttp.dll"), "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddress));
-        // HookIATProcedure(GetModuleHandleW(L"icu.dll"), "GetProcAddress", reinterpret_cast<FARPROC>(&BadGetProcAddress));
         return true;
     }
 
