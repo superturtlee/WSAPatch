@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include <windows.h>
-
+#include <versionhelpers.h>
 #include "Log.h"
 #include "ErrnoRestorer.h"
 #include "TimeUtils.h"
